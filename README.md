@@ -12,8 +12,9 @@ Pick a region, e.g. 'us-east-1'.
 
 Spin up a Cloud9 in 'us-east-1'. Assign the Cloud9's EC2 instance an AdministratorAccess role, then visit `Cloud9 -> Preferences -> AWS Settings -> Credentials`, and disable the `AWS managed Temporary Credentials`.
 
-Prepare your Cloud9  with following commands:
+### Prepare Your Cloud9 environment
 
+#### Install/configure some utilities, configure aws-cli, and add some AWS environment vars:
 ```bash
 sudo yum install -y jq tree
 export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
@@ -24,7 +25,23 @@ aws configure set default.region ${AWS_REGION}
 aws configure get default.region
 ```
 
-And while we're at it, some handy aliases...
+#### Install IAM authenticator:
+```
+curl -o aws-iam-authenticator https://s3.us-west-2.amazonaws.com/amazon-eks/1.21.2/2021-07-05/bin/linux/amd64/aws-iam-authenticator
+chmod +x ./aws-iam-authenticator
+mkdir -p $HOME/bin && cp ./aws-iam-authenticator $HOME/bin/aws-iam-authenticator && export PATH=$PATH:$HOME/bin
+echo 'export PATH=$PATH:$HOME/bin' >> ~/.bashrc
+```
+
+#### These CDK pre-reqs should already be there, but if not ...
+(Version 1.134.0 for cdk matches the package-lock.json)
+```
+sudo yum install -y npm
+npm install -g aws-cdk@1.134.0 --force
+npm install -g typescript@latest
+```
+
+#### (And while we're at it, some handy aliases...)
 ```
 cat <<EOF >> ~/.bash_profile
 
@@ -52,7 +69,47 @@ set -o vi
 EOF
 ```
 
+#### Git clone our repository
+```
+cd ~/environment
+git clone https://github.com/lawromwal/a-blue-green-webapp
+```
+
+### CDK Launch
 The infrastructure is spawned using AWS Cloud Development Kit (CDK), enabling you to reproduce the environment when needed, in relatively fewer lines of code.
+```
+# Create a new cdk project
+cd ~/environment/a-blue-green-webapp/cdk
+cdk init
+
+# Install the required modules from package.json
+npm install
+
+# Compile the packages to Javascript
+npm run build
+
+# List the empty stack; should see "CdkStackEksALBBg"
+cdk ls
+
+# Generate a CloudFormation template from the CDK
+cdk synth
+
+# Bootstrap the CDKToolkit CloudFormation stack into your environment
+cdk bootstrap aws://$ACCOUNT_ID/$AWS_REGION --force
+
+# Launch the CloudFormation stacks created in the earlier steps.
+# You may be asked to confirm the creation of the roles and authorization
+# before the CloudFormation is executed, for which, you can respond with a “Y”.
+cdk deploy
+
+# An S3 bucket prefixed with "cdktoolkit-stagingbucket-" is created for that region.
+```
+
+The infrastructure will take some time to be created, please wait until you see the Output of CloudFormation printed on the terminal. Until then, take time to review the CDK code in the below file: cdk/lib/cdk-stack.ts
+
+You may also check and compare the CloudFormation Template created from this CDK stack:
+cdk/cdk.out/CdkStackEksALBBg.template.json
+
 
 The hosting infrastructure consists of pods hosted on Blue and Green service on Kubernetes Worker Nodes, being accessed via an Application LoadBalancer. The Blue service represents the production environment accessed using the ALB DNS with http query (group=blue) whereas Green service represents a pre-production / test environment that is accessed using a different http query (group=green). The CodePipeline build stage uses CodeBuild to dockerize the application and post the images to Amazon ECR. In subsequent stages, the image is picked up and deployed on the Green service of the EKS. The Codepipeline workflow is then blocked at the approval stage, allowing the application in Green service to be tested. Once the application is confirmed to be working fine, the user can issue an approval at the Approval Stage and the application is then deployed on to the Blue Service.
 
@@ -67,74 +124,26 @@ The CodePipeline would look like the below figure:
 <img src="images/stage12-green.png" alt="dashboard" style="border:1px solid black">
 <img src="images/stage34-green.png" alt="dashboard" style="border:1px solid black">
 
-The current workshop is based upon this link and the CDK here is extended further to incorporate CodePipeline, Blue/Green Deployment on EKS with ALB. We will also use the weighted target-group to configure B/G Canary Deployment method. Note that currently CodeDeploy does not support deploying on EKS and thus we will instead use CodeBuild to run commands to deploy the Containers on Pods, spawn the EKS Ingress controller and Ingress resource that takes form of ALB. This workshop focuses on providing a simplistic method, though typical deployable model for production environments. Note that blue/green deployments can be achieved using AppMesh, Lambda, DNS based canary deployments too.
+The current workshop is based upon this link and the CDK here is extended further to incorporate CodePipeline, Blue/Green Deployment on EKS with ALB.
 
-Prepare CDK prerequisite:
+Note that currently CodeDeploy does not support deploying on EKS; thus this example instead uses CodeBuild to run commands to deploy the Containers on Pods, spawn the EKS Ingress controller and Ingress resource that takes the form of an Application Load Balancer (ALB).
 
-```bash
-sudo yum install -y npm
-npm install -g aws-cdk@1.124.0 --force
-npm install -g typescript@latest
-```
-Run git clone on this repository from Cloud9:
+NOTE: If using the latest CDK version using "npm install -g aws-cdk" (without a version specification), the EKS construct must be modified to include version number too.
 
-```bash
-git clone https://github.com/aws-samples/amazon-eks-cdk-blue-green-cicd.git amazon-eks-cicd-codebuild-eks-alb-bg
-```
+#### Configure EKS environment
 
-Once cloned, run the below commands:
-```bash
-cd amazon-eks-cicd-codebuild-eks-alb-bg
-```
+Once the cdk is deployed successfully...
 
-Note: For this workshop, we are using CDK version 1.30. If using the latest CDK version using "npm install -g aws-cdk" (without a version specification) then you would need to modify the EKS construct to include version number too.
-
-
-```bash
-git init
-git add .
-git commit -m "Initial Commit"
-git status
-git log
-```
-Now run the CDK steps as below:
-
-```bash
-cd cdk
-cdk init
-npm install
-npm run build
-cdk ls
-```
-Ensure the output is CdkStackEksALBBg
-
-```bash
-cdk synth
-cdk bootstrap aws://$ACCOUNT_ID/$AWS_REGION
-cdk deploy
-```
-You may be asked to confirm the creation of the roles and authorization before the CloudFormation is executed, for which, you can respond with a “Y”.
-
-The infrastructure will take some time to be created, please wait until you see the Output of CloudFormation printed on the terminal. Until then, take time to review the CDK code in the below file: cdk/lib/cdk-stack.ts
-
-You may also check and compare the CloudFormation Template created from this CDK stack:
-cdk/cdk.out/CdkStackEksALBBg.template.json
-
-
-<b> Step2: Configure EKS environment:</b>
-
-Once the cdk is deployed successfully, go to the CloudFormation Service, select the CdkStackALBEksBg stack and go to the outputs section to copy the value from the field "ClusterConfigCommand".
-
-<img src="images/cfn-kubectl.png" alt="dashboard" style="border:1px solid black">
-
-Then paste this output into Cloud9 terminal to configure the EKS context.
-Ensure you can see 2 nodes listed in the output of :
+1. Go to the CloudFormation Service,
+1. Select the CdkStackALBEksBg stack,
+1. Go to the **outputs** section, and 
+1. Copy the value from the field "ClusterConfigCommand".  <img src="images/cfn-kubectl.png" alt="dashboard" style="border:1px solid black">
+1. Then, paste this output into Cloud9 terminal to configure the EKS context.
+1. Ensure you can see 2 nodes listed in the output of :
 ```bash
 kubectl get nodes
 ```
-
-Now configure the EKS cluster with the deployment, service and ingress resource as ALB using following set of commands:
-
+1. Now, configure the EKS cluster with the deployment, service and ingress resource as ALB using following set of commands:
 ```bash
 cd ../flask-docker-app/k8s
 ls setup.sh
@@ -146,14 +155,17 @@ echo "INSTANCE_ROLE = " $INSTANCE_ROLE
 echo "CLUSTER_NAME = " $CLUSTER_NAME
 ```
 
-Note: Before proceeding further, confirm to see that both the variables $INSTANCE_ROLE and $CLUSTER_NAME have values populated. IF not, please bring it to the attention of the workshop owner, possibly the IAM role naming convention may have changed with the version.
-Also, after EKS version 1.16 onwards, the k8 deploy API's using apps/v1beta1 is deprecated to apps/v1. The update has been made into the yaml files, however, if you are using an older version of EKS, you may need to modify this back.
+Note: Before proceeding further, confirm to see that both the variables $INSTANCE_ROLE and $CLUSTER_NAME have values populated.
+
+(After EKS version 1.16 onwards, the k8 deploy API's using apps/v1beta1 is deprecated to apps/v1. The update has been made into the yaml files, however, if you are using an older version of EKS, you may need to change this back).
 
 ```bash
 ./setup2.sh $AWS_REGION $INSTANCE_ROLE $CLUSTER_NAME
 ```
 
-<b>Step3: Modify the ALB Security Group:</b>
+### STOPPED HERE - BELOW is to-be-updated
+
+### Modify the ALB Security Group
 
 Modify the Security Group (ControlPlaneSecurityGroup) for the newly spawned Application Load Balancer to add an incoming rule to allow http port 80 for the 0.0.0.0/0.
 Services -> EC2 -> Load Balancer -> Select the latest created ALB -> Click Description Tab -> Scroll down to locate the Security Group Edit this security group to add a new rule with following parameters: http, 80, 0.0.0.0/0
