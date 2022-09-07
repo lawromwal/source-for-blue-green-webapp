@@ -1,6 +1,58 @@
-## Building CI/CD with Blue/Green and Canary Deployments on EKS using CDK
+# Multi-Pipeline CI/CD with Blue/Green Deployments on EKS
 
-In this workshop you'll learn building a CI/CD pipeline (AWS CodePipeline) to develop a web-based application, containerize it, and deploy it on a Amazon EKS cluster. You'll use the blue/green method to deploy application and review the switchover using Application Load Balancer (ALB) Target-groups. You will spawn this infrastructure using AWS Cloud Development Kit (CDK), enabling you to reproduce the environment when needed, in relatively fewer lines of code.
+This repo contains a sample webapp derived from https://github.com/aws-samples/amazon-eks-cdk-blue-green-cicd.git.  It implements the webapp-pipeline portion of this process:
+
+<img src="images/devops-capstone.png" alt="dashboard" style="border:1px solid black">
+
+It demonstrates using the blue/green method to deploy application and review the switchover using Application Load Balancer (ALB) Target-groups.
+
+## Set up Cloud9
+
+Pick a region, e.g. 'us-east-1'.
+
+Spin up a Cloud9 in 'us-east-1'. Assign the Cloud9's EC2 instance an AdministratorAccess role, then visit `Cloud9 -> Preferences -> AWS Settings -> Credentials`, and disable the `AWS managed Temporary Credentials`.
+
+Prepare your Cloud9  with following commands:
+
+```bash
+sudo yum install -y jq tree
+export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
+export AWS_REGION=$(curl -s 169.254.169.254/latest/dynamic/instance-identity/document | jq -r '.region')
+echo "export ACCOUNT_ID=${ACCOUNT_ID}" | tee -a ~/.bash_profile
+echo "export AWS_REGION=${AWS_REGION}" | tee -a ~/.bash_profile
+aws configure set default.region ${AWS_REGION}
+aws configure get default.region
+```
+
+And while we're at it, some handy aliases...
+```
+cat <<EOF >> ~/.bash_profile
+
+alias a='aws'
+alias k='kubectl'
+alias addog='git log --all --decorate --oneline --graph --pretty=format:"%C(yellow)%h%Creset%C(cyan)%C(bold)%d%Creset %C(cyan)%cd%Creset %s" --date=format:"%y-%m%d-%H%M"'
+alias adog='git log --all --decorate --oneline --graph'
+alias ga='git add'
+alias gb='git branch'
+alias gc='git commit'
+alias gco='git checkout'
+alias gcom='git checkout main'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gl='git config -l'
+alias gr='git remote -v'
+alias gril='grep --color=auto -ril --exclude-dir=vendor --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=venv --exclude-dir=_site'
+alias gs='git status'
+alias h='git rev-parse HEAD'
+alias grep='grep --color=auto'
+alias l.='ls -d .* --color=auto'
+alias ll='ls -l --color=auto'
+alias ls='ls --color=auto'
+set -o vi
+EOF
+```
+
+The infrastructure is spawned using AWS Cloud Development Kit (CDK), enabling you to reproduce the environment when needed, in relatively fewer lines of code.
 
 The hosting infrastructure consists of pods hosted on Blue and Green service on Kubernetes Worker Nodes, being accessed via an Application LoadBalancer. The Blue service represents the production environment accessed using the ALB DNS with http query (group=blue) whereas Green service represents a pre-production / test environment that is accessed using a different http query (group=green). The CodePipeline build stage uses CodeBuild to dockerize the application and post the images to Amazon ECR. In subsequent stages, the image is picked up and deployed on the Green service of the EKS. The Codepipeline workflow is then blocked at the approval stage, allowing the application in Green service to be tested. Once the application is confirmed to be working fine, the user can issue an approval at the Approval Stage and the application is then deployed on to the Blue Service.
 
@@ -17,30 +69,6 @@ The CodePipeline would look like the below figure:
 
 The current workshop is based upon this link and the CDK here is extended further to incorporate CodePipeline, Blue/Green Deployment on EKS with ALB. We will also use the weighted target-group to configure B/G Canary Deployment method. Note that currently CodeDeploy does not support deploying on EKS and thus we will instead use CodeBuild to run commands to deploy the Containers on Pods, spawn the EKS Ingress controller and Ingress resource that takes form of ALB. This workshop focuses on providing a simplistic method, though typical deployable model for production environments. Note that blue/green deployments can be achieved using AppMesh, Lambda, DNS based canary deployments too.
 
-### Procedure to follow:
-
-<b>Step1. Cloud9 and commands to run:</b>
-
-First launch a Cloud9 terminal and prepare it with following commands:
-
-```bash
-sudo yum install -y jq
-export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
-export AWS_REGION=$(curl -s 169.254.169.254/latest/dynamic/instance-identity/document | jq -r '.region')
-echo "export ACCOUNT_ID=${ACCOUNT_ID}" | tee -a ~/.bash_profile
-echo "export AWS_REGION=${AWS_REGION}" | tee -a ~/.bash_profile
-aws configure set default.region ${AWS_REGION}
-aws configure get default.region
-```
-Ensure the Cloud9 is assigned a role of an administrator and from Cloud9 -> AWS Settings -> Credentials -> Disable the Temporary Credentials
-Now install kubectl package:
-
-```bash
-curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.17.0/bin/linux/amd64/kubectl
-chmod +x ./kubectl
-sudo mv ./kubectl /usr/local/bin/kubectl
-kubectl help
-```
 Prepare CDK prerequisite:
 
 ```bash
