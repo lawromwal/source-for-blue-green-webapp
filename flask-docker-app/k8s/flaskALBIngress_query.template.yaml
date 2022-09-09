@@ -6,8 +6,8 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/subnets: subnet-0f39fbf5f0289255b, subnet-0b6fecee36c40c81c, subnet-0dcf50e47b67ab611
-    alb.ingress.kubernetes.io/security-groups: sg-0ff094c50da44126b
+    alb.ingress.kubernetes.io/subnets: public-subnets
+    alb.ingress.kubernetes.io/security-groups: sec-grp
     alb.ingress.kubernetes.io/conditions.flask-svc-alb-green: '[{"Field":"query-string","QueryStringConfig":{"Values":[{"Key":"group","Value":"green"}]}}]'
     alb.ingress.kubernetes.io/conditions.forward-multiple-tg: '[{"Field":"query-string","QueryStringConfig":{"Values":[{"Key":"group","Value":"blue"}]}}]'
     alb.ingress.kubernetes.io/actions.forward-multiple-tg: '{"Type":"forward","ForwardConfig":{"TargetGroups":[{"ServiceName":"flask-svc-alb-blue","ServicePort":"80","Weight":100},{"ServiceName":"flask-svc-alb-green","ServicePort":"8080","Weight":0}]}}'

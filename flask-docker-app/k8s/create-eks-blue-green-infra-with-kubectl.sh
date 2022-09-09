@@ -17,7 +17,6 @@ echo "------CLEANUP BEGIN-----"
 echo "========================"
 set -x
 ## rm flaskALBIngress_query.yaml
-cp flaskALBIngress_query.template.yaml flaskALBIngress_query.yaml
 ## wget https://raw.githubusercontent.com/aws-samples/amazon-eks-cdk-blue-green-cicd/master/flask-docker-app/k8s/flaskALBIngress_query.yaml
 rm alb-ingress-controller.yaml
 kubectl delete svc/flask-svc-alb-blue svc/flask-svc-alb-green -n flask-alb
@@ -55,10 +54,7 @@ fi
 
 # Create Ingress Controller
 echo "Creating Ingress Controller..."
-if [ ! -f alb-ingress-controller.yaml ]; then
-    ## wget https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.5/docs/examples/alb-ingress-controller.yaml
-    cp alb-ingress-controller.template.yaml alb-ingress-controller.yaml
-fi
+cp alb-ingress-controller.template.yaml alb-ingress-controller.yaml
 sed -i "s/devCluster/$CLUSTER_NAME/g" alb-ingress-controller.yaml
 sed -i "s/# - --cluster-name/- --cluster-name/g" alb-ingress-controller.yaml
 ## kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.5/docs/examples/rbac-role.yaml
@@ -91,6 +87,7 @@ kubectl get pods -n flask-alb
 
 # Update Ingress Resource file and spawn ALB
 echo Updating Ingress Resource file and spawning ALB...
+cp flaskALBIngress_query.template.yaml flaskALBIngress_query.yaml
 sg=$(aws ec2 describe-security-groups --filters Name=tag:aws:cloudformation:stack-name,Values=CdkStackALBEksBg | jq '.SecurityGroups[0].GroupId' | tr -d '["]')
 vpcid=$(aws ec2 describe-security-groups --filters Name=tag:aws:cloudformation:stack-name,Values=CdkStackALBEksBg | jq '.SecurityGroups[0].VpcId' | tr -d '["]')
 subnets=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpcid" "Name=tag:aws-cdk:subnet-name,Values=Public" | jq '.Subnets[0].SubnetId' | tr -d '["]')
