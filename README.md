@@ -77,6 +77,7 @@ git clone https://github.com/lawromwal/source-for-blue-green-webapp
 
 ### CDK Launch
 The infrastructure is spawned using AWS Cloud Development Kit (CDK), enabling you to reproduce the environment when needed, in relatively fewer lines of code.
+
 ```
 # Create a new cdk project
 cd ~/environment/source-for-blue-green-webapp/cdk
@@ -91,18 +92,33 @@ npm run build
 # List the empty stack; should see "CdkStackEksALBBg"
 cdk ls
 
-# Generate a CloudFormation template from the CDK
+# Emit the CDK-originated CloudFormation template to STDOUT...
 cdk synth
 
+
 # Bootstrap the CDKToolkit CloudFormation stack into your environment
+
+# Deploying AWS CDK apps into an AWS environment (a combination of an AWS account and region) requires that you provision resources the AWS CDK needs to perform the deployment. These resources include an Amazon S3 bucket for storing files and IAM roles that grant permissions needed to perform deployments. The process of provisioning these initial resources is called bootstrapping.
+
+# The required resources are defined in a AWS CloudFormation stack, called the bootstrap stack, which is usually named CDKToolkit. Like any AWS CloudFormation stack, it appears in the AWS CloudFormation console once it has been deployed.
+
 cdk bootstrap aws://$ACCOUNT_ID/$AWS_REGION --force
 
-# Launch the CloudFormation stacks created in the earlier steps.
+# Launch the CloudFormation stack created in the earlier steps.
 # You may be asked to confirm the creation of the roles and authorization
 # before the CloudFormation is executed, for which, you can respond with a “Y”.
 cdk deploy
 
 # An S3 bucket prefixed with "cdktoolkit-stagingbucket-" is created for that region.
+```
+
+### Populate the application's source code repo
+Because the CdkStackEksALBBg-repo repository is empty, the CodePipeline will show a failure in the Source CodeCommit repository stage.
+
+Push your local application to the newly created CodeCommit Repository: CdkStackEksALBBg-repo.
+```
+git remote add codecommit https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/CdkStackALBEksBg-repo
+git push -u codecommit main
 ```
 
 The infrastructure will take some time to be created, please wait until you see the Output of CloudFormation printed on the terminal. Until then, take time to review the CDK code in the below file: cdk/lib/cdk-stack.ts
@@ -145,15 +161,14 @@ kubectl get nodes
 1. Now, configure the EKS cluster with the deployment, service and ingress resource as ALB using following set of commands:
 ```bash
 cd ../flask-docker-app/k8s
-ls setup.sh
 chmod +x create-eks-blue-green-infra-with-kubectl.sh
-INSTANCE_ROLE=$(aws cloudformation describe-stack-resources --stack-name CdkStackALBEksBg | jq .StackResources[].PhysicalResourceId | grep CdkStackALBEksBg-ClusterDefaultCapacityInstanceRol | tr -d '["\r\n]')
+INSTANCE_ROLE=$(aws cloudformation describe-stack-resources --stack-name CdkStackALBEksBg | jq .StackResources[].PhysicalResourceId | grep CdkStackALBEksBg-ClusterNodegroupDefaultCapacityNo | tr -d '["\r\n]')
 CLUSTER_NAME=$(aws cloudformation describe-stack-resources --stack-name CdkStackALBEksBg | jq '.StackResources[] | select(.ResourceType=="Custom::AWSCDK-EKS-Cluster").PhysicalResourceId' | tr -d '["\r\n]')
 echo "INSTANCE_ROLE = " $INSTANCE_ROLE 
 echo "CLUSTER_NAME = " $CLUSTER_NAME
 ```
 
-Note: Before proceeding further, confirm to see that both the variables $INSTANCE_ROLE and $CLUSTER_NAME have values populated.
+Note: Before proceeding further, confirm to see that both the variables $INSTANCE_ROLE and $CLUSTER_NAME have values populated.  If they are not, you may collect the Clustername from the CloudFormation Output and the Worker node instance role from the EC2 dashboard.
 
 (After EKS version 1.16 onwards, the k8 deploy API's using apps/v1beta1 is deprecated to apps/v1. The update has been made into the yaml files, however, if you are using an older version of EKS, you may need to change this back).
 
