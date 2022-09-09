@@ -89,7 +89,7 @@ npm install
 # Compile the packages to Javascript
 npm run build
 
-# List the empty stack; should see "CdkStackEksALBBg"
+# List the empty stack; should see "CdkStackALBEksBg"
 cdk ls
 
 # Emit the CDK-originated CloudFormation template to STDOUT...
@@ -113,13 +113,13 @@ cdk deploy
 ```
 
 ### Populate the application's source code repo
-Because the CdkStackEksALBBg-repo repository is empty, the CodePipeline will show a failure in the Source CodeCommit repository stage.
+Because the CdkStackALBEksBg-repo repository is empty, the CodePipeline will show a failure in the Source CodeCommit repository stage.
 
-In a below step, you will git-push your local application to the newly created CodeCommit Repository: CdkStackEksALBBg-repo.
+In a below step, you will git-push your local application to the newly created CodeCommit Repository: CdkStackALBEksBg-repo.
 
 The infrastructure will take some time to be created. Meanwhile, take a look at the CDK stack's source code in the below file: `cdk/lib/cdk-stack.ts`.
 
-Also, check out the CloudFormation Template created from this CDK stack: `cdk/cdk.out/CdkStackEksALBBg.template.json`.
+Also, check out the CloudFormation Template created from this CDK stack: `cdk/cdk.out/CdkStackALBEksBg.template.json`.
 
 
 The hosting infrastructure consists of pods hosted on Blue and Green service on Kubernetes Worker Nodes, being accessed via an Application LoadBalancer. The Blue service represents the production environment accessed using the ALB DNS with http query (group=blue) whereas Green service represents a pre-production / test environment that is accessed using a different http query (group=green). The CodePipeline build stage uses CodeBuild to dockerize the application and post the images to Amazon ECR. In subsequent stages, the image is picked up and deployed on the Green service of the EKS. The Codepipeline workflow is then blocked at the approval stage, allowing the application in Green service to be tested. Once the application is confirmed to be working fine, the user can issue an approval at the Approval Stage and the application is then deployed on to the Blue Service.
@@ -129,7 +129,7 @@ The Blue/Green architecture diagrams are provided below:
 <img src="images/eks-bg-1.png" alt="dashboard" style="border:1px solid black">
 <img src="images/eks-bg-2.png" alt="dashboard" style="border:1px solid black">
 
-The CodePipeline would look like the below figure:
+The CodePipeline should look like the below figure:
 
 <img src="images/stage12-green.png" alt="dashboard" style="border:1px solid black">
 <img src="images/stage34-green.png" alt="dashboard" style="border:1px solid black">
@@ -155,8 +155,7 @@ kubectl get nodes
 ```
 1. Now, configure the EKS cluster with the deployment, service and ingress resource as ALB using following set of commands:
 ```bash
-cd ../flask-docker-app/k8s
-chmod +x create-eks-blue-green-infra-with-kubectl.sh
+cd ~/environment/flask-docker-app/k8s
 INSTANCE_ROLE=$(aws cloudformation describe-stack-resources --stack-name CdkStackALBEksBg | jq .StackResources[].PhysicalResourceId | grep CdkStackALBEksBg-ClusterNodegroupDefaultCapacityNo | tr -d '["\r\n]')
 CLUSTER_NAME=$(aws cloudformation describe-stack-resources --stack-name CdkStackALBEksBg | jq '.StackResources[] | select(.ResourceType=="Custom::AWSCDK-EKS-Cluster").PhysicalResourceId' | tr -d '["\r\n]')
 echo "INSTANCE_ROLE = " $INSTANCE_ROLE 
@@ -165,8 +164,6 @@ echo "CLUSTER_NAME = " $CLUSTER_NAME
 
 Note: Before proceeding further, confirm to see that both the variables $INSTANCE_ROLE and $CLUSTER_NAME have values populated.  If they are not, you may collect the Clustername from the CloudFormation Output and the Worker node instance role from the EC2 dashboard.
 
-(After EKS version 1.16 onwards, the k8 deploy API's using apps/v1beta1 is deprecated to apps/v1. The update has been made into the yaml files, however, if you are using an older version of EKS, you may need to change this back).
-
 ```bash
 # $AWS_REGION $INSTANCE_ROLE $CLUSTER_NAME
 ./create-eks-blue-green-infra-with-kubectl.sh 
@@ -174,9 +171,7 @@ Note: Before proceeding further, confirm to see that both the variables $INSTANC
 
 ### STOPPED HERE - BELOW is to-be-updated
 
-For up-to-date instructions, Refer to https://catalog.us-east-1.prod.workshops.aws/workshops/2175d94a-cd79-4ed2-8e7e-1f0dd1956a3a/en-US/upload
-
-Now, check the newly created LoadBalancer and review the listener routing rules: Services -> EC2 -> Load Balancer -> Select the latest created ALB -> Click Listeners Tab -> View/Edit Rules You would see the below settings shown:
+(For up-to-date instructions, Refer to https://catalog.us-east-1.prod.workshops.aws/workshops/2175d94a-cd79-4ed2-8e7e-1f0dd1956a3a/en-US/upload)
 
 Check the Load Balancer Target-groups and ensure the healthy hosts have registered and health check is consistently passing as shown below:
 
@@ -188,7 +183,7 @@ Check the healthy hosts count graph to ensure the hosts, containers are stable:
 
 ### Push the Application to the CodeCommit repo:
 
-Push your local application to the empty CodeCommit Repository: CdkStackEksALBBg-repo.
+Push your local application to the empty CodeCommit Repository: CdkStackALBEksBg-repo.
 ```
 git remote add codecommit https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/CdkStackALBEksBg-repo
 git push -u codecommit main
@@ -205,10 +200,9 @@ Once the Application is pushed to the Repository, the CodePipeline will be trigg
 <img src="images/web-blue.png" alt="dashboard" style="border:1px solid black">
 <img src="images/web-green.png" alt="dashboard" style="border:1px solid black">
 
-
-Go to Services -> CodePipeline -> Pipelines -> CdkStackEksALBBg-[unique-string]
-Review the Stages and the CodeBuild Projects to understand the implementation.
-Once the Application is deployed on the Green service, access it as mentioned above: http://ALB-DNS-name/?group=green.
+* Go to Services -> CodePipeline -> Pipelines -> CdkStackALBEksBg-[unique-string]
+* Review the Stages and the CodeBuild Projects to understand the implementation.
+* Once the Application is deployed on the Green service, access it as mentioned above: http://ALB-DNS-name/?group=green.
 
 It is important to note that the container exposes port 5000, whereas the service exposes port 80 (for blue-service) OR 8080 (for green-service) which in turn is mapped to local host port on the EC2 worker node instance.
 
