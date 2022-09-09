@@ -72,14 +72,14 @@ EOF
 #### Git clone our repository
 ```
 cd ~/environment
-git clone https://github.com/lawromwal/a-blue-green-webapp
+git clone https://github.com/lawromwal/source-for-blue-green-webapp
 ```
 
 ### CDK Launch
 The infrastructure is spawned using AWS Cloud Development Kit (CDK), enabling you to reproduce the environment when needed, in relatively fewer lines of code.
 ```
 # Create a new cdk project
-cd ~/environment/a-blue-green-webapp/cdk
+cd ~/environment/source-for-blue-green-webapp/cdk
 cdk init
 
 # Install the required modules from package.json
@@ -117,7 +117,6 @@ The Blue/Green architecture diagrams are provided below:
 
 <img src="images/eks-bg-1.png" alt="dashboard" style="border:1px solid black">
 <img src="images/eks-bg-2.png" alt="dashboard" style="border:1px solid black">
-<img src="images/eks-canary.png" alt="dashboard" style="border:1px solid black">
 
 The CodePipeline would look like the below figure:
 
@@ -126,7 +125,7 @@ The CodePipeline would look like the below figure:
 
 The current workshop is based upon this link and the CDK here is extended further to incorporate CodePipeline, Blue/Green Deployment on EKS with ALB.
 
-Note that currently CodeDeploy does not support deploying on EKS; thus this example instead uses CodeBuild to run commands to deploy the Containers on Pods, spawn the EKS Ingress controller and Ingress resource that takes the form of an Application Load Balancer (ALB).
+NOTE: CodeDeploy does not currently support deploying on EKS.  So instead, we use CodeBuild to run the deploy of the Containers on Pods, spawn the EKS Ingress controller, and spawn the Ingress resource in the form of an Application Load Balancer (ALB).
 
 NOTE: If using the latest CDK version using "npm install -g aws-cdk" (without a version specification), the EKS construct must be modified to include version number too.
 
@@ -147,8 +146,7 @@ kubectl get nodes
 ```bash
 cd ../flask-docker-app/k8s
 ls setup.sh
-chmod +x setup.sh
-chmod +x setup2.sh
+chmod +x create-eks-blue-green-infra-with-kubectl.sh
 INSTANCE_ROLE=$(aws cloudformation describe-stack-resources --stack-name CdkStackALBEksBg | jq .StackResources[].PhysicalResourceId | grep CdkStackALBEksBg-ClusterDefaultCapacityInstanceRol | tr -d '["\r\n]')
 CLUSTER_NAME=$(aws cloudformation describe-stack-resources --stack-name CdkStackALBEksBg | jq '.StackResources[] | select(.ResourceType=="Custom::AWSCDK-EKS-Cluster").PhysicalResourceId' | tr -d '["\r\n]')
 echo "INSTANCE_ROLE = " $INSTANCE_ROLE 
@@ -160,7 +158,8 @@ Note: Before proceeding further, confirm to see that both the variables $INSTANC
 (After EKS version 1.16 onwards, the k8 deploy API's using apps/v1beta1 is deprecated to apps/v1. The update has been made into the yaml files, however, if you are using an older version of EKS, you may need to change this back).
 
 ```bash
-./setup2.sh $AWS_REGION $INSTANCE_ROLE $CLUSTER_NAME
+# $AWS_REGION $INSTANCE_ROLE $CLUSTER_NAME
+./create-eks-blue-green-infra-with-kubectl.sh 
 ```
 
 ### STOPPED HERE - BELOW is to-be-updated
@@ -191,7 +190,6 @@ cd ../..
 pwd => confirm your current directory is amazon-eks-cicd-codebuild-eks-alb-bg
 git add flask-docker-app/k8s/alb-ingress-controller.yaml
 git add flask-docker-app/k8s/flaskALBIngress_query.yaml
-git add flask-docker-app/k8s/flaskALBIngress_query2.yaml
 git add flask-docker-app/k8s/iam-policy.json
 git commit -m "Updated files"
 git remote add codecommit https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/CdkStackALBEksBg-repo
@@ -225,24 +223,6 @@ After testing is completed, go to the Approval Stage and Click Approve. This wil
 <img src="images/web-green-inv.png" alt="dashboard" style="border:1px solid black">
 
 
-### Configuring for Canary Deployments:
-
-Configure your ALB for Canary based deployments using below commands from your Cloud9 terminal:
-
-```bash
-cd /home/ec2-user/environment/amazon-eks-cicd-codebuild-eks-alb-bg/flask-docker-app/k8s
-kubectl apply -f flaskALBIngress_query2.yaml
-```
-
-<img src="images/canary-lb.png" alt="dashboard" style="border:1px solid black">
-
-To bring the ALB config to the non-canary configuration, run the below commands:
-
-```bash
-cd /home/ec2-user/environment/amazon-eks-cicd-codebuild-eks-alb-bg/flask-docker-app/k8s
-kubectl apply -f flaskALBIngress_query.yaml
-```
-
 ### Cleanup
 
 (a) Remove the EKS Services:
@@ -268,11 +248,4 @@ Access IAM Service, then access Policies, then select â€œalb-ingress-controllerâ
 
 ### Conclusion:
 
-We built the CICD Pipeline using CDK to containerize and deploy a Python Flask based application using the Blue/Green Deployment method on Amazon EKS. We made the code change and saw it propagated through the CICD pipeline and deploy on Blue/Green service of EKS. We also configured and tested B/G Canary Deployment method.
-
-Hope you enjoyed the workshop!
-
-
-## License
-
-This library is licensed under the MIT-0 License. See the LICENSE file.
+We built the CICD Pipeline using CDK to containerize and deploy a Python Flask based application using the Blue/Green Deployment method on Amazon EKS. We made the code change and saw it propagated through the CICD pipeline and deploy on Blue/Green service of EKS.
