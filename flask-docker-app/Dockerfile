@@ -1,4 +1,5 @@
-FROM public.ecr.aws/p8v8e7e5/myartifacts:alpine-3.8
+FROM 822580616975.dkr.ecr.us-east-1.amazonaws.com/capstone-base-image
+
 RUN apk add python3 py-pip && \
 python3 -m ensurepip && \
 pip install --upgrade pip && \
