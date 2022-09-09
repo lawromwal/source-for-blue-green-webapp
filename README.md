@@ -115,16 +115,11 @@ cdk deploy
 ### Populate the application's source code repo
 Because the CdkStackEksALBBg-repo repository is empty, the CodePipeline will show a failure in the Source CodeCommit repository stage.
 
-Push your local application to the newly created CodeCommit Repository: CdkStackEksALBBg-repo.
-```
-git remote add codecommit https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/CdkStackALBEksBg-repo
-git push -u codecommit main
-```
+In a below step, you will git-push your local application to the newly created CodeCommit Repository: CdkStackEksALBBg-repo.
 
-The infrastructure will take some time to be created, please wait until you see the Output of CloudFormation printed on the terminal. Until then, take time to review the CDK code in the below file: cdk/lib/cdk-stack.ts
+The infrastructure will take some time to be created. Meanwhile, take a look at the CDK stack's source code in the below file: `cdk/lib/cdk-stack.ts`.
 
-You may also check and compare the CloudFormation Template created from this CDK stack:
-cdk/cdk.out/CdkStackEksALBBg.template.json
+Also, check out the CloudFormation Template created from this CDK stack: `cdk/cdk.out/CdkStackEksALBBg.template.json`.
 
 
 The hosting infrastructure consists of pods hosted on Blue and Green service on Kubernetes Worker Nodes, being accessed via an Application LoadBalancer. The Blue service represents the production environment accessed using the ALB DNS with http query (group=blue) whereas Green service represents a pre-production / test environment that is accessed using a different http query (group=green). The CodePipeline build stage uses CodeBuild to dockerize the application and post the images to Amazon ECR. In subsequent stages, the image is picked up and deployed on the Green service of the EKS. The Codepipeline workflow is then blocked at the approval stage, allowing the application in Green service to be tested. Once the application is confirmed to be working fine, the user can issue an approval at the Approval Stage and the application is then deployed on to the Blue Service.
@@ -179,12 +174,7 @@ Note: Before proceeding further, confirm to see that both the variables $INSTANC
 
 ### STOPPED HERE - BELOW is to-be-updated
 
-### Modify the ALB Security Group
-
-Modify the Security Group (ControlPlaneSecurityGroup) for the newly spawned Application Load Balancer to add an incoming rule to allow http port 80 for the 0.0.0.0/0.
-Services -> EC2 -> Load Balancer -> Select the latest created ALB -> Click Description Tab -> Scroll down to locate the Security Group Edit this security group to add a new rule with following parameters: http, 80, 0.0.0.0/0
-
-Additionally, from EKS version 1.17 onwards, you would also need to change the security-group for Worker Nodes Data Plane (InstanceSecurityGroup) by adding an incoming rule to allow http port 80 for the ControlPlaneSecurityGroup (ALB).
+For up-to-date instructions, Refer to https://catalog.us-east-1.prod.workshops.aws/workshops/2175d94a-cd79-4ed2-8e7e-1f0dd1956a3a/en-US/upload
 
 Now, check the newly created LoadBalancer and review the listener routing rules: Services -> EC2 -> Load Balancer -> Select the latest created ALB -> Click Listeners Tab -> View/Edit Rules You would see the below settings shown:
 
@@ -196,22 +186,13 @@ Check the healthy hosts count graph to ensure the hosts, containers are stable:
 
 <img src="images/alb-tg-check1.png" alt="dashboard" style="border:1px solid black">
 
-<b> Step4: Upload the Application to CodeCommit repo:</b>
+### Push the Application to the CodeCommit repo:
 
-Now that the ALB is setup, complete the last part of the configuration by uploading the code to CodeCommit repository:
-
-```bash
-cd ../..
-pwd => confirm your current directory is amazon-eks-cicd-codebuild-eks-alb-bg
-git add flask-docker-app/k8s/alb-ingress-controller.yaml
-git add flask-docker-app/k8s/flaskALBIngress_query.yaml
-git add flask-docker-app/k8s/iam-policy.json
-git commit -m "Updated files"
-git remote add codecommit https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/CdkStackALBEksBg-repo
-git push -u codecommit master
+Push your local application to the empty CodeCommit Repository: CdkStackEksALBBg-repo.
 ```
-
-This will push the last commit we carried out in our preparation section, which in turn will trigger the CodePipeline.
+git remote add codecommit https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/CdkStackALBEksBg-repo
+git push -u codecommit main
+```
 
 ### Review the Infrastructure:
 
@@ -229,7 +210,7 @@ Go to Services -> CodePipeline -> Pipelines -> CdkStackEksALBBg-[unique-string]
 Review the Stages and the CodeBuild Projects to understand the implementation.
 Once the Application is deployed on the Green service, access it as mentioned above: http://ALB-DNS-name/?group=green.
 
-It is important to note that container exposes port 5000, whereas service exposes port 80 (for blue-service) OR 8080 (for green-service) which in turn is mapped to local host port on the EC2 worker node instance.
+It is important to note that the container exposes port 5000, whereas the service exposes port 80 (for blue-service) OR 8080 (for green-service) which in turn is mapped to local host port on the EC2 worker node instance.
 
 After testing is completed, go to the Approval Stage and Click Approve. This will trigger the CodePipeline to execute the next stage to run the "Swap and Deploy" stage where it swaps the mapping of target-group to the blue / green service.
 
