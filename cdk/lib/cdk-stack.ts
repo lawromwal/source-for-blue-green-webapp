@@ -178,6 +178,7 @@ export class CdkStackALBEksBg extends cdk.Stack {
       actionName: 'CodeCommit',
       repository,
       output: sourceOutput,
+      branch: 'main'
     });
 
     const buildAction = new codepipeline_actions.CodeBuildAction({
